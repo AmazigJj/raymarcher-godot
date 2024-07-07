@@ -1,0 +1,135 @@
+[gd_scene load_steps=22 format=3 uid="uid://b2w71voerpit5"]
+
+[ext_resource type="Shader" path="res://raymarcher.gdshader" id="1_85jcw"]
+
+[sub_resource type="Gradient" id="Gradient_xuccr"]
+offsets = PackedFloat32Array(0, 0.272251, 0.780105)
+colors = PackedColorArray(0.419608, 0.239216, 0.129412, 1, 0.523445, 0.238008, 0.0895674, 1, 0.580392, 0.298039, 0.156863, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_gbkil"]
+seed = -65
+frequency = 0.1
+fractal_lacunarity = 4.0
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_mfgym"]
+width = 1024
+height = 1024
+seamless = true
+color_ramp = SubResource("Gradient_xuccr")
+noise = SubResource("FastNoiseLite_gbkil")
+
+[sub_resource type="Gradient" id="Gradient_0dv7l"]
+offsets = PackedFloat32Array(0.0837696, 0.366492, 0.5, 1)
+colors = PackedColorArray(0.12549, 0.396078, 0.133333, 1, 0.167638, 0.778918, 0.333534, 1, 0.135026, 0.482695, 0.178628, 1, 0.172549, 0.823529, 0.356863, 1)
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_5yudx"]
+frequency = 0.1
+fractal_lacunarity = 4.0
+domain_warp_enabled = true
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_x6ttt"]
+width = 1024
+height = 1024
+seamless = true
+color_ramp = SubResource("Gradient_0dv7l")
+noise = SubResource("FastNoiseLite_5yudx")
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_r58pb"]
+seed = 755
+frequency = 0.002
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_ki3ee"]
+width = 1024
+height = 1024
+seamless = true
+noise = SubResource("FastNoiseLite_r58pb")
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_a6cxx"]
+frequency = 0.0125
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_ckiv0"]
+width = 1024
+height = 1024
+seamless = true
+noise = SubResource("FastNoiseLite_a6cxx")
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_43wic"]
+seed = 50
+frequency = 0.02
+fractal_lacunarity = 3.0
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_m3kv5"]
+width = 1024
+height = 1024
+seamless = true
+noise = SubResource("FastNoiseLite_43wic")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_6ncs1"]
+render_priority = 0
+shader = ExtResource("1_85jcw")
+shader_parameter/albedo = null
+shader_parameter/point_size = null
+shader_parameter/roughness = null
+shader_parameter/metallic_texture_channel = null
+shader_parameter/specular = null
+shader_parameter/metallic = null
+shader_parameter/uv1_scale = null
+shader_parameter/uv1_offset = null
+shader_parameter/uv2_scale = null
+shader_parameter/uv2_offset = null
+shader_parameter/heightmapA = SubResource("NoiseTexture2D_ki3ee")
+shader_parameter/heightmapB = SubResource("NoiseTexture2D_ckiv0")
+shader_parameter/heightmapC = SubResource("NoiseTexture2D_m3kv5")
+shader_parameter/grass_texture = SubResource("NoiseTexture2D_x6ttt")
+shader_parameter/dirt_texture = SubResource("NoiseTexture2D_mfgym")
+
+[sub_resource type="QuadMesh" id="QuadMesh_hgvht"]
+material = SubResource("ShaderMaterial_6ncs1")
+
+[sub_resource type="BoxMesh" id="BoxMesh_rubb7"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_b20ox"]
+
+[sub_resource type="Sky" id="Sky_3fycu"]
+sky_material = SubResource("ProceduralSkyMaterial_b20ox")
+
+[sub_resource type="Environment" id="Environment_qwy0k"]
+background_mode = 2
+sky = SubResource("Sky_3fycu")
+
+[sub_resource type="SphereMesh" id="SphereMesh_80tqk"]
+radius = 1.0
+height = 2.0
+
+[sub_resource type="BoxMesh" id="BoxMesh_i1r86"]
+size = Vector3(13, 0.25, 1)
+
+[node name="Node3D" type="Node3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+custom_aabb = AABB(-10000, -10000, -10000, 20000, 20000, 20000)
+mesh = SubResource("QuadMesh_hgvht")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 8)
+current = true
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -3, 0)
+visible = false
+mesh = SubResource("BoxMesh_rubb7")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_qwy0k")
+
+[node name="MeshInstance3D3" type="MeshInstance3D" parent="."]
+visible = false
+mesh = SubResource("SphereMesh_80tqk")
+
+[node name="MeshInstance3D4" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.125, 0)
+visible = false
+mesh = SubResource("BoxMesh_i1r86")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-4.37114e-08, -0.866025, 0.5, 0, 0.5, 0.866025, -1, 3.78552e-08, -2.18557e-08, -17.1579, 11.8818, 0)

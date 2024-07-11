@@ -1,7 +1,7 @@
 // NOTE: Shader automatically converted from Godot Engine 4.2.2.stable's StandardMaterial3D.
 
 shader_type spatial;
-render_mode blend_mix,depth_draw_opaque,cull_back,diffuse_burley/*unshaded*/,specular_disabled;
+render_mode blend_mix,depth_draw_opaque,cull_back,diffuse_lambert/*unshaded*/,specular_disabled;
 uniform vec4 albedo : source_color;
 uniform sampler2D texture_albedo : source_color,filter_linear_mipmap,repeat_enable;
 uniform float point_size : hint_range(0,128);
@@ -41,13 +41,15 @@ float sphere_distance_with_displacement(vec3 pos, vec4 sphere, float freq, float
 	return sphere_distance(pos, sphere) + displacement;
 }
 
-float distance_heightmap(vec2 pos) {
-	float heightA = texture(heightmapA, pos / 32.0).x;
-	float heightB = texture(heightmapB, pos / 32.0).x;
-	float height = (heightA * 8.0);
-	// float height = blend(heightA, heightB, 0.1);
+float distance_heightmap(vec3 pos) {
+	vec2 tex_pos = pos.xz;
+	float heightA = texture(heightmapA, tex_pos / 32.0).x;
+	float heightB = texture(heightmapB, tex_pos / 32.0).x;
+	float height = (heightA * sin(TIME)*8.0);
+	// float height = sin(pos.z);
+	// float height = mix(heightA, heightB, 0.1);
 	// float height = (heightA) + (heightB);
-	return height;
+	return pos.y - height;
 }
 
 float easeInSine(float x) {
@@ -127,6 +129,10 @@ float distance_sdf(vec3 pos) {
 		distPillar = min(distPillar, sphere_distance(pos, vec4(0, 4, 0, 1.0)));
 		dist = min(dist, distPillar);
 	}
+	{
+		// The light source
+		dist = min(dist, sphere_distance(pos, vec4(-17.158, 11.882, 0.0, 1.0)));
+	}
 
 	return dist;
 }
@@ -141,32 +147,10 @@ vec3 normal_sdf_test(vec3 pos) {
 	return normal;
 }
 
-vec3 normal_terrain(vec3 pos) {
-	// float slopeX = dFdx(distance_heightmap(pos.xz));
-	// float slopeZ = dFdy(distance_heightmap(pos.xz));
-	// float slopeY = sqrt(1.0 - (slopeX*slopeX) - (slopeZ*slopeZ));
-	// // Normal points in opposite sign as it slopes 
-	// vec3 normal = vec3(-slopeX, slopeY, -slopeZ);
-
-	vec2 coords = pos.xz;
-	float unit = 1.0;
-	float up		= distance_heightmap(coords + vec2( 0, -1) * unit);
-	float down		= distance_heightmap(coords + vec2( 0,  1) * unit);
-	float left		= distance_heightmap(coords + vec2(-1,  0) * unit);
-	float right		= distance_heightmap(coords + vec2( 1,  0) * unit);
-
-	vec3 xdiff = pos + vec3(right-left, 0.0, 0.0);
-	vec3 ydiff = pos + vec3(0.0, 0.0, down-up);
-
-
-	vec3 normal = normalize(cross(xdiff, ydiff));
-
-	return normal;
-}
 
 bool raymarch(vec3 pos, vec3 dir, float terrain_distance, out float distance) {
 	float d = 0.0;
-	for (int i = 0; i < 100; i++) {
+	for (int i = 0; i < 50; i++) {
 		float step_dist = distance_sdf(pos + (dir * d));
 		d += step_dist;
 		if (step_dist < 0.001) {
@@ -186,8 +170,8 @@ bool raymarch_terrain(vec3 origin, vec3 dir, out float ret_t) {
 	float ly = 0.0;
 	for (float t = minT; t < maxT; t+= dt) {
 		vec3 sample_point = origin + dir * t;
-		float terrain_height = distance_heightmap(sample_point.xz);
-		float distance_to_terrain = sample_point.y - terrain_height;
+		float distance_to_terrain = distance_heightmap(sample_point);
+		float terrain_height = sample_point.y - distance_to_terrain;
 		if (distance_to_terrain < 0.01) {
 			ret_t = t - dt + dt * ((lh - ly) / (sample_point.y - ly - terrain_height + lh));
 			return true;
@@ -197,6 +181,38 @@ bool raymarch_terrain(vec3 origin, vec3 dir, out float ret_t) {
 		dt = t * 0.01; // step 1% of the cumulative distance travelled
 	}
 	return false;
+}
+
+vec3 normal_terrain(vec3 pos) {
+	// float slopeX = dFdx(distance_heightmap(pos.xz));
+	// float slopeZ = dFdy(distance_heightmap(pos.xz));
+	// float slopeY = sqrt(1.0 - (slopeX*slopeX) - (slopeZ*slopeZ));
+	// // Normal points in opposite sign as it slopes 
+	// vec3 normal = vec3(-slopeX, slopeY, -slopeZ);
+	
+
+	// vec2 coords = pos.xz;
+	// float unit = 0.1;
+	// float up		= distance_heightmap(coords + vec2( 0, -1) * unit);
+	// float down		= distance_heightmap(coords + vec2( 0,  1) * unit);
+	// float left		= distance_heightmap(coords + vec2(-1,  0) * unit);
+	// float right		= distance_heightmap(coords + vec2( 1,  0) * unit);
+	//
+	// vec3 xdiff = pos + vec3(right-left, 0.0, 0.0);
+	// vec3 ydiff = pos + vec3(1.0, 0.0, down-up);
+	//
+	//
+	// vec3 normal = normalize(cross(xdiff, ydiff));
+
+	
+	float epsilon = 0.1; // arbitrary — should be smaller than any surface detail in your distance function, but not so small as to get lost in float precision
+	float centerDistance	= distance_heightmap(pos);
+	float xDistance			= distance_heightmap(pos + vec3(epsilon, 0, 0));
+	float yDistance			= distance_heightmap(pos + vec3(0, epsilon, 0));
+	float zDistance			= distance_heightmap(pos + vec3(0, 0, epsilon));
+	vec3 normal = (vec3(xDistance, yDistance, zDistance) - centerDistance) / epsilon;
+
+	return normal;
 }
 
 vec3 color_terrain(vec3 pos) {
@@ -223,38 +239,25 @@ vec3 color_sdf(vec3 pos) {
 }
 
 void fragment() {
-	//vec2 base_uv = UV;
-	//vec4 albedo_tex = texture(texture_albedo,base_uv);
-	//ALBEDO = albedo.rgb * albedo_tex.rgb;
-	//float metallic_tex = dot(texture(texture_metallic,base_uv),metallic_texture_channel);
-	//METALLIC = metallic_tex * metallic;
-	//vec4 roughness_texture_channel = vec4(1.0,0.0,0.0,0.0);
-	//float roughness_tex = dot(texture(texture_roughness,base_uv),roughness_texture_channel);
-	//ROUGHNESS = roughness_tex * roughness;
-	//SPECULAR = specular;
-	//
 	vec3 pos = CAMERA_POSITION_WORLD;
-	vec2 fd = (FRAGCOORD.xy - 0.5*VIEWPORT_SIZE); // VIEWPORT_SIZE -> 1600,900
+	vec2 fd = (FRAGCOORD.xy - 0.5*VIEWPORT_SIZE);
 	vec3 dir = normalize(vec3(fd.x, -fd.y, -VIEWPORT_SIZE.y));
-
-	// vec2 fd = (SCREEN_UV - 0.5);
-	// vec3 dir = normalize(vec3(fd.x * (16.0/9.0), -fd.y, -1.0));
 	
 	dir = (INV_VIEW_MATRIX * vec4(dir, 0.0)).xyz;
-	//vec3 dir = normalize(-CAMERA_DIRECTION_WORLD);
+
 	float terrain_distance = -1.0;
 	bool found_terrain = raymarch_terrain(pos, normalize(dir), terrain_distance);
 	vec3 terrain_position = pos + (dir * terrain_distance);
 
 	float sdf_distance = -1.0;
 	bool sdf_found = raymarch(pos, normalize(dir), terrain_distance, sdf_distance);
-	vec3 sdf_position = vec3(pos + dir * sdf_distance);
+	vec3 sdf_position = pos + (dir * sdf_distance);
 
 	bool show_terrain = found_terrain && terrain_distance < sdf_distance;
 	bool debug = false;
 	if (show_terrain) {
 		vec3 terrain_color = color_terrain(terrain_position);
-		vec3 terrain_normal = (INV_VIEW_MATRIX * vec4(normal_terrain(terrain_position), 0.0)).xyz;
+		vec3 terrain_normal = normal_terrain(terrain_position);
 		ALBEDO = debug ? terrain_normal : terrain_color;
 		DEPTH = terrain_distance / 300.0;
 		NORMAL_MAP = terrain_normal;
@@ -265,21 +268,4 @@ void fragment() {
 		DEPTH = sdf_found ? sdf_distance/4000.0 : 1.0;
 		NORMAL_MAP = sdf_normal;
 	}
-
-	//vec3 dir = normalize(vec3(pixel.xy - 0.5*resolution.xy, resolution.y));
-	// ALBEDO = vec3(terrain_distance / 300.0, 0.0, 0.0);
-	// DEPTH = 0.0;
-
-	// ALBEDO = vec3(1.0,0,0);
-	// ALBEDO = vec3(m.w/4000.0, 0.0, 0.0);
-	
-	// ALBEDO = vec3(DEPTH,0,0);
-
-	// ALBEDO = vec3(m.w/10000000.0);
-
-	// ALBEDO = NORMAL;
-	//ALPHA = m.w;
-	//ALBEDO = CAMERA_DIRECTION_WORLD
-	
-	//ALBEDO=vec3((FRAGCOORD.xy/VIEWPORT_SIZE).xy, 0.0);
 }
